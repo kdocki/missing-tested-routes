@@ -269,7 +269,7 @@ function print_test_for_route($route)
     $funcName = str_replace(['.', '-'], '_', strtolower($name));
 
     $dataLine = null;
-    $callParams = color("'{$method}', '{$uri}'", 'yellow');
+    $callParams = color("'{$method}', \"{$uri}\"", 'yellow');
     $assertParams = '200, $response->status()';
     $incompleteParams = color("'This test is incomplete'", 'yellow');
 
