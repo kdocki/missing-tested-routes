@@ -12,25 +12,43 @@ function routes()
 
 	foreach ($routes as $route)
 	{
-		$name = $route->getName();
+		$action = simple_route_action($route);
 
-		if ($name) $routesByKey[$name] = $route;
+		if ($action) $routesByKey[$action] = $route;
 	}
 
 	return $routesByKey;
 }
 
+/**
+ * easy way to get the route name
+ * stripped of it's namespace (if it has one)
+ */
+function simple_route_action($route)
+{
+	$name = $route->getActionName();
+
+	$action = $route->getAction();
+
+	if ($name && $action && array_key_exists('namespace', $action))
+	{
+		$name = remove_beginning($action['namespace'] . '\\', $name);
+	}
+
+	return $name;
+}
 
 /**
- * this replaces first instance of string found
- * 
- * str_replace_first found on http://stackoverflow.com/questions/1252693/using-str-replace-so-that-it-only-acts-on-the-first-match
+ * this removes substr from the beginning of this string
  */
-function str_replace_first($from, $to, $subject)
+function remove_beginning($substr, $string)
 {
-    $from = '/'.preg_quote($from, '/').'/';
+	if (strpos($string, $substr) === 0)
+	{
+		return substr($string, strlen($substr));
+	}
 
-    return preg_replace($from, $to, $subject, 1);
+	return $string;
 }
 
 
@@ -146,9 +164,9 @@ function filterOutRouteAnnotations($annotations)
 
 	foreach ($annotations as $annotation)
 	{
-		if (starts_with($annotation, 'route '))
+		if (starts_with($annotation, 'action '))
 		{
-			$filtered[] = explode(' ', str_replace_first('route ', '', trim($annotation)))[0]; 
+			$filtered[] = explode(' ', remove_beginning('action ', trim($annotation)))[0]; 
 		}
 	}
 
@@ -173,7 +191,7 @@ function allTestedRoutes()
 	foreach ($finder as $file)
 	{
 		try {
-			$annotations = array_merge($annotations, annotationsOf($file));			
+			$annotations = array_merge($annotations, annotationsOf($file));
 		} catch (Exception $e) {
 			print ' --- got an error on ' . $file->getBaseName() . PHP_EOL;
 
@@ -264,9 +282,12 @@ function print_test_for_route($route)
 {
     $method = $route->methods()[0];
     $uri    = '/' . $route->uri();
-    $name   = $route->getName();
-    $action = $route->getActionName();
-    $funcName = str_replace(['.', '-'], '_', strtolower($name));
+    $action = simple_route_action($route);
+    $routeName = $route->getName();
+    $name   = $route->getName() ?: simple_route_action($route);
+    $funcName = strtolower(str_replace(['.', '-', '\\', '@'], '_', $name));
+    
+    if (!$action) return;
 
     $dataLine = null;
     $callParams = color("'{$method}', \"{$uri}\"", 'yellow');
@@ -277,11 +298,13 @@ function print_test_for_route($route)
     {
 	    $callParams .= ', $data';
 	    $dataLine = '    $data = [];';
+	    $assertParams = '302, $response->status()';
     }
 
     eol('');
 	eol("/**", 'dark_gray');
-	eol(" * @route {$name}", 'dark_gray');
+	if ($routeName) eol(" * @route {$routeName}", 'dark_gray');
+	eol(" * @action {$action}", 'dark_gray');
 	eol(" */", 'dark_gray');
 
 	eol(
@@ -327,7 +350,7 @@ function print_invalid($invalid)
 
 	eol('');
 	eol('WARNING', 'yellow');
-	eol('You have ' . color('@routes', 'green') . ' annotations ');
+	eol('You have ' . color('@action', 'green') . ' annotations ');
 	eol('for route names that do not exist ');
 	eol('in your Laravel application: ');
 
